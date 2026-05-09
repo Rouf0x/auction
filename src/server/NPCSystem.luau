@@ -19,7 +19,6 @@ type NPCInstance = {
 	RotatePersonality: (self: NPCInstance) -> (),
 }
 
--- Configuration & Data
 local adjectives = {
 	"Swift", "Glowy", "Eccentric", "Cosmic", "Boring", "Zesty",
 	"Infamous", "Clumsy", "Elegant", "Uninterested", "Heavenly", "Kind",
@@ -70,9 +69,7 @@ function NPC:GetInfo(): string
 	return self
 end
 
-function NPC:Hesitate(currentBid: number): number
-	local self = self :: NPCInstance
-	
+function NPC.Hesitate(self: NPCInstance, currentBid: number): number
 	local aggroWait = (1 -  (self.aggressivity / 100)) * 4
 	local priceRatio = currentBid / self.balance
 	local stressWait
@@ -88,9 +85,7 @@ function NPC:Hesitate(currentBid: number): number
 	return hesitation
 end
 
-function NPC:ProcessAction(avgPrice: number, currentBid: number): number
-	local self = self :: NPCInstance
-
+function NPC.ProcessAction(self: NPCInstance, avgPrice: number, currentBid: number): number
 	local multiplier = 0.7 + (self.aggressivity / 100) * 0.5
 	local maxBudget = avgPrice * multiplier
 
@@ -98,7 +93,6 @@ function NPC:ProcessAction(avgPrice: number, currentBid: number): number
 		return 0
 	end
 
-	-- If bid is 0, start at ~5-10% of avg price. Otherwise, bid 10-20% higher than current.
 	local minIncrement, maxIncrement
 	if currentBid == 0 then
 		minIncrement = math.floor(avgPrice * 0.05)
@@ -108,16 +102,20 @@ function NPC:ProcessAction(avgPrice: number, currentBid: number): number
 		maxIncrement = math.floor(currentBid * 1.25)
 	end
 
-	-- Ensure min isn't higher than max for math.random
-	if minIncrement >= maxIncrement then maxIncrement = minIncrement + 1 end
+	if minIncrement >= maxIncrement then
+		maxIncrement = minIncrement + 1
+	end
 
 	local finalBid = math.random(minIncrement, maxIncrement)
 
-	-- Don't bid more than budget or balance
-	if finalBid > maxBudget then finalBid = maxBudget end
-	if finalBid > self.balance then finalBid = self.balance end
+	if finalBid > maxBudget then
+		finalBid = maxBudget
+	end
 
-	-- Ensure the final calculated bid is actually an improvement
+	if finalBid > self.balance then
+		finalBid = self.balance
+	end
+
 	if finalBid <= currentBid then return 0 end
 
 	return math.floor(finalBid)
@@ -128,9 +126,6 @@ local NPCSystem = {
 }
 
 function NPC:RotatePersonality()
-	local self = self :: NPCInstance
-
-	-- removed the redundant first balance assignment
 	self.aggressivity = math.random(1, 100)
 	self.balance = weightedAverage(500, 3000)
 	self.isThinking = false
@@ -144,11 +139,9 @@ function NPCSystem.ResetNPCs()
 	end
 end
 
-function NPC:Update(avgPrice: number, currentBid: number, currentBidder: string): number?
-	local self = self :: NPCInstance
+function NPC.Update(self: NPCInstance, avgPrice: number, currentBid: number, currentBidder: string): number?
 	local currentTime = os.clock()
 
-	-- If I am currently winning, reset my thinking state
 	if currentBidder == self.name then
 		self.isThinking = false
 		self.targetBid = nil
@@ -166,7 +159,6 @@ function NPC:Update(avgPrice: number, currentBid: number, currentBidder: string)
 		return nil
 	end
 
-	-- NEW: If someone else bids higher than or equal to my planned targetBid while I'm thinking, reset.
 	if self.isThinking and self.targetBid and currentBid >= self.targetBid then
 		self.isThinking = false
 		self.targetBid = nil
@@ -181,7 +173,6 @@ function NPC:Update(avgPrice: number, currentBid: number, currentBidder: string)
 		self.nextBidTime = nil
 		self.targetBid = nil
 
-		-- Final check to ensure we aren't outbid at the last millisecond
 		if finalBid <= currentBid then return nil end
 		return finalBid
 	end
@@ -215,13 +206,11 @@ function NPCSystem.UpdateNPCs(auction: any)
 	end
 end
 
-function NPC:RemoveMoney(amount: number): ()
-	local self = self :: NPCInstance
+function NPC.RemoveMoney(self: NPCInstance, amount: number): ()
 	self.balance -= amount
 end
 
-function NPC:AddItem(name: string, amount: number, condition: string, price: number, desc: string)
-	local self = self :: NPCInstance
+function NPC.AddItem(self: NPCInstance, _name: string, _amount: number, _condition: string, price: number, _desc: string)
 	self.balance += price
 	
 	self.isThinking = false
@@ -234,7 +223,7 @@ end
 function NPCSystem.Start()
 	print("NPC System Started") 
 
-	for i = 1, 5 do
+	for _ = 1, 5 do
 		local newNPC = NPC.new()
 		table.insert(NPCSystem.ActiveNPCs, newNPC)
 	end

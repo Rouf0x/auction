@@ -1,0 +1,15 @@
+local ServerScriptService = game:GetService("ServerScriptService")
+local Players = game:GetService("Players")
+
+local InventorySystem = require(ServerScriptService.Server.InventorySystem)
+
+Players.PlayerAdded:Connect(function(player)
+	local items = InventorySystem.GetItems(player)
+	print(items)
+	InventorySystem.AddItem(player, "Test Item", 1, "New", 10, "A test item")
+	items = InventorySystem.GetItems(player)
+	print(items)
+	InventorySystem.RemoveItem(player, "Test Item", "New", 1)
+	items = InventorySystem.GetItems(player)
+	print(items)
+end)

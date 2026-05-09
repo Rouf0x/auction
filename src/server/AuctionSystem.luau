@@ -62,8 +62,6 @@ function AuctionSystem.new(): AuctionClass
 end
 
 function AuctionSystem:StartAuction(item: any, duration: number): ()
-	local self: AuctionClass = self
-
 	self.Auction.started = true
 	self.Auction.currentBid = 0
 	self.Auction.currentBidder = nil
@@ -78,8 +76,6 @@ function AuctionSystem:StartAuction(item: any, duration: number): ()
 end
 
 function AuctionSystem:ResetAuctionState(): ()
-	local self: AuctionClass = self
-
 	self.Auction.started = false
 	self.Auction.currentBid = 0
 	self.Auction.currentBidder = nil
@@ -88,8 +84,6 @@ function AuctionSystem:ResetAuctionState(): ()
 end
 
 function AuctionSystem:EndAuction(): ()
-	local self: AuctionClass = self
-
 	local winner: any = self.Auction.currentBidder
 	local item: any = self.Auction.item
 	local finalPrice: number = self.Auction.currentBid
@@ -102,11 +96,9 @@ function AuctionSystem:EndAuction(): ()
 	local isPlayer = typeof(winner) == "Instance"
 
 	if isPlayer then
-		-- Route through stateless systems, DataSystem is the source of truth
 		EconomySystem.RemoveMoney(winner, finalPrice)
 		InventorySystem.AddItem(winner, item.Name, item.Amount, item.Condition, item.Price, item.Description)
 	else
-		-- NPC: update their balance directly
 		winner.balance -= finalPrice
 	end
 
@@ -114,8 +106,6 @@ function AuctionSystem:EndAuction(): ()
 end
 
 function AuctionSystem:Bid(bidder: any, amount: number): ()
-	local self: AuctionClass = self
-
 	if not self.Auction.started or self:GetTimeRemaining() <= 0 then return end
 
 	local isNPC = typeof(bidder) == "table"
@@ -166,8 +156,6 @@ function AuctionSystem:Bid(bidder: any, amount: number): ()
 end
 
 function AuctionSystem:ScheduleAuctionEnd(): ()
-	local self: AuctionClass = self
-
 	task.delay(self.Auction.duration, function()
 		self:EndAuction()
 	end)
@@ -177,13 +165,11 @@ function AuctionSystem:UpdateAllClients(): ()
 	AuctionEvent:FireAllClients("update", self.Auction, NPCSystem.ActiveNPCs)
 end
 
-function AuctionSystem:GetTimeRemaining(): number
-	local self: AuctionClass = self
+function AuctionSystem.GetTimeRemaining(self: AuctionClass): number
+    if not self.Auction.started then return 0 end
 
-	if not self.Auction.started then return 0 end
-
-	local endTime = self.Auction.startTime + self.Auction.duration
-	return math.max(0, endTime - os.clock())
+    local endTime = self.Auction.startTime + self.Auction.duration
+    return math.max(0, endTime - os.clock())
 end
 
 return AuctionSystem
