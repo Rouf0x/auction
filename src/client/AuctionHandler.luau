@@ -1,105 +1,108 @@
+-- WARNING: THIS CANNOT HANDLE MULTIPLE AUCTIONS AT ONCE
+-- MUST FIX NOW BUT IM TOO LAZY FFS
+
 local AuctionHandler = {}
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Events = ReplicatedStorage:WaitForChild("Events")
-local AuctionEvent = Events:WaitForChild("AuctionEvent")
+local AuctionEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("AuctionEvent")
+
 local SettedUpButtons = {}
 local SettedUpDisplays = {}
-
-local currentAuction = nil
 local autoBid = true
 
-function UpdateDisplay(displayText: TextLabel)
-	AuctionEvent.OnClientEvent:Connect(function(action, auction)
-		if action ~= "update" then return end
-		currentAuction = auction
-	end)
-	RunService.Heartbeat:Connect(function()
-		if not currentAuction or not currentAuction.started then
-			displayText.Text = "No Auction"
-			return
-		end
-		local endTime = currentAuction.startTime + currentAuction.duration
-		local currentTime = os.clock()
-		local remainingTime = math.max(0, endTime - currentTime)
+local currentAuction = nil
+local auctionEndAt = 0
 
-		local bidderName = "Nobody"
-		if currentAuction.currentBidder then
-			bidderName = currentAuction.currentBidder.name
-		end
+AuctionEvent.OnClientEvent:Connect(function(action, auction, _npcs, serverEndAt)
+	if action ~= "update" then
+		return
+	end
+	currentAuction = auction
+	auctionEndAt = serverEndAt
+end)
 
-		displayText.Text = string.format(
-			"-- Auction --\n" ..
-				"Item: %s\n" ..
-				"Current Bid: %d\n" ..
-				"Current Bidder: %s\n" ..
-				"Time Remaining: %d\n",
+local displayTexts = {}
+
+RunService.Heartbeat:Connect(function()
+	if #displayTexts == 0 then
+		return
+	end
+
+	local text
+	if not currentAuction or not currentAuction.started then
+		text = "No Auction"
+	else
+		local remaining = math.max(0, auctionEndAt - os.clock())
+		text = string.format(
+			"-- Auction --\nItem: %s\nCurrent Bid: %d\nCurrent Bidder: %s\nTime Remaining: %.1f",
 			currentAuction.item.Name,
 			currentAuction.currentBid,
-			bidderName,
-			remainingTime
+			currentAuction.currentBidderName,
+			remaining
 		)
-	end)
-end
+	end
 
-function SetupDisplay(display)
-	if SettedUpDisplays[display] then return end
+	for _, displayText in ipairs(displayTexts) do
+		displayText.Text = text
+	end
+end)
+
+local function SetupDisplay(display)
+	if SettedUpDisplays[display] then
+		return
+	end
 	SettedUpDisplays[display] = true
-	local displayGui = display:FindFirstChildOfClass("SurfaceGui")
-	local displayText = displayGui and displayGui:FindFirstChildOfClass("TextLabel")
 
-	if not displayText then
-		warn('Incorrect Setup: ', display)
+	local gui = display:FindFirstChildOfClass("SurfaceGui")
+	local label = gui and gui:FindFirstChildOfClass("TextLabel")
+	if not label then
+		warn("Incorrect Setup: ", display)
 		return
 	end
 
-	task.spawn(function()
-		UpdateDisplay(displayText)
-	end)
+	table.insert(displayTexts, label)
 end
 
-function Bid(amount)
-	AuctionEvent:FireServer("bid", amount)
-end
-
-function SetupButton(bidButton)
-	if SettedUpButtons[bidButton] then return end
+local function SetupButton(bidButton)
+	if SettedUpButtons[bidButton] then
+		return
+	end
 	SettedUpButtons[bidButton] = true
+
 	local bidAmountPart = bidButton:FindFirstChild("BidAmount")
 	local clickDetector = bidButton:FindFirstChildOfClass("ClickDetector")
-
 	if not bidAmountPart or not clickDetector then
-		warn('Incorrect Setup: ', bidButton)
+		warn("Incorrect Setup: ", bidButton)
 		return
 	end
 
-	local bidAmountGui = bidAmountPart:FindFirstChildOfClass("SurfaceGui")
-	local bidAmountField = bidAmountGui and bidAmountGui:FindFirstChildOfClass("TextBox")
-
-	if not bidAmountField then
-		warn('Incorrect Setup: ', bidButton)
+	local gui = bidAmountPart:FindFirstChildOfClass("SurfaceGui")
+	local field = gui and gui:FindFirstChildOfClass("TextBox")
+	if not field then
+		warn("Incorrect Setup: ", bidButton)
 		return
 	end
-	
+
 	clickDetector.MouseClick:Connect(function()
-		if autoBid and currentAuction and currentAuction.started then
-			local autoBidAmount = math.floor(currentAuction.currentBid * 1.2)
-			Bid(autoBidAmount)
+		if not currentAuction or not currentAuction.started then
+			return
+		end
+		if autoBid then
+			AuctionEvent:FireServer("bid", math.floor(currentAuction.currentBid * 1.2))
 		else
-			local bidAmount = tonumber(bidAmountField.Text) or 0
-			Bid(bidAmount)
+			AuctionEvent:FireServer("bid", tonumber(field.Text) or 0)
 		end
 	end)
 end
 
 function AuctionHandler.Start()
-	print('Auction Handler Started')
-	for _, button in pairs(CollectionService:GetTagged("BidButton")) do
-		task.spawn(SetupButton, button)
+	print("Auction Handler Started")
+	for _, b in pairs(CollectionService:GetTagged("BidButton")) do
+		SetupButton(b)
 	end
-	for _, display in pairs(CollectionService:GetTagged("AuctionDisplay")) do
-		task.spawn(SetupDisplay, display)
+	for _, d in pairs(CollectionService:GetTagged("AuctionDisplay")) do
+		SetupDisplay(d)
 	end
 	CollectionService:GetInstanceAddedSignal("BidButton"):Connect(SetupButton)
 	CollectionService:GetInstanceAddedSignal("AuctionDisplay"):Connect(SetupDisplay)
